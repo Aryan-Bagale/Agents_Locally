@@ -1,42 +1,44 @@
-import os
 from typing import TypedDict, List, Union
-from langchain_core.messages import HumanMessage,  AIMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain_ollama import ChatOllama 
 from langgraph.graph import StateGraph, START, END
 
 class AgentState(TypedDict):
-    messages : List[Union[HumanMessage, AIMessage]]
+    messages: List[Union[HumanMessage, AIMessage]]
 
 llm = ChatOllama(model="qwen3:4b")
+
 def process(state: AgentState) -> AgentState:
-    response = llm.invoke(state["messages"]) 
-    state["messages"].append(AIMessage(content = response.content))
-    print(f"\nAI: {response.content}")
+    """
+    This function runs inside the LangGraph.
+    It takes the current state (chat history), sends it to the LLM,
+    gets the response, and adds it back to the state.
+    """
+    response = llm.invoke(state['messages'])
+    ai_message = AIMessage(content=response.content)
+    state['messages'].append(ai_message)
+    print(f"AI: {response.content}")
     return state
 
-def summarize(state: AgentState) -> AgentState:
-    summary = llm.invoke([HumanMessage(content="Summarize the conversation so far")] + state["messages"])
-    print(f"\nSummary: {summary.content}")
-    return state
-
-graph = StateGraph(AgentState)
-graph.add_node("process", process)
-graph.add_node("summarize", summarize)
-graph.add_edge(START, "process")
-graph.add_edge("process", "summarize") 
-graph.add_edge("summarize", END) 
+graph = StateGraph(AgentState)        
+graph.add_node("process", process)    
+graph.add_edge(START, "process")      
+graph.add_edge("process", END)        
 agent = graph.compile()
 
 
 conversation_history = []
 
-user_input = input("Enter: ")
+print("Chat with AI. Type 'exit' to quit.\n")
+user_input = input("You: ") 
+
 while user_input != "exit":
     conversation_history.append(HumanMessage(content=user_input))
     result = agent.invoke({"messages": conversation_history})
-    conversation_history = result["messages"]
-    user_input = input("Enter: ")
+    conversation_history = result['messages']
+    user_input = input("You: ")
 
+print("Chat ended.")
 
 with open("logging.txt", "w") as file:
     file.write("Your Conversation Log:\n")
